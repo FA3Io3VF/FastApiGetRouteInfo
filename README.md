@@ -9,18 +9,34 @@ def get_function_name():
     return inspect.stack()[1][3]
 ```
 
-## Second way:
+## Second way (Full BackTrack):
 
 ```python
-from fastapi.concurrency import run_in_threadpool
+
+import traceback
+
+def get_calling_functions():
+    stack_trace = traceback.extract_stack()
+    calling_functions = []
+    for frame in stack_trace[:-1]:
+        filename = frame.filename
+        function_name = frame.name
+        calling_functions.append(f"{filename} -> {function_name}")
+    return " -> ".join(calling_functions)
+
+```
+
+## Another way
+
+```python
 import inspect
 
-async def get_function_name() -> str:
+async def current_frame_get_function_name() -> str:
+    """Ottiene il nome della funzione dal frame corrente"""
     frame = inspect.currentframe().f_back
     func_name = frame.f_code.co_name
     return func_name
 ```
-
 
 ## Use the first way:
 
@@ -56,45 +72,27 @@ async def change_password(username: str,
 
 ## Use the second way:
 
-Please note the use of run_in_threadpool in the function dependency get_db to perform asynchronous operations
-in a thread pool. This allows you to avoid blocking of the main thread, improving application performance.
-
 ```python
-from fastapi.concurrency import run_in_threadpool
-import inspect
+import random
+import time
 
-async def get_function_name() -> str:
-    frame = inspect.currentframe().f_back
-    func_name = frame.f_code.co_name
-    return func_name
+def my_function():
+    calling_functions = get_calling_functions()
+    print(f"Calling functions: {calling_functions}")
+    time.sleep(random.uniform(1, 3))
+    another_function()
 
-@app.put("/users/{username}/password", summary = "", description="", response_description="", response_model=None)
-async def change_password(username: str, 
-                          new_password: str, 
-                          db: AsyncSession = Depends(get_db),  
-                          current_user = Depends(get_current_user)): -> Dict[str, str]: 
-    try:
-        db_user = db.query(User).filter_by(username=username).first()
-    except:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-                            detail=f"Internal Server Error in {await get_function_name()} at \
-                            {app.url_path_for(await get_function_name())} - user: {current_user.username}"
-                            )
-        
-    if not db_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"User not found at: {await get_function_name()} at \
-                            {app.url_path_for(await get_function_name())} - user: {current_user.username}"
-                            )
-    try:
-        db_user.password = new_password
-        await db.commit()
-    except Exception as e:
-        await db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-                            detail=f"Internal Server Error in {await get_function_name()} at \
-                            {app.url_path_for(await get_function_name())} - user: {current_user.username} - {str(e)}"
-                            )
-    return {"message": "Password changed successfully"}
- ```
+def another_function():
+    calling_functions = get_calling_functions()
+    print(f"Calling functions: {calling_functions}")
+    time.sleep(random.uniform(1, 3))
+    third_function()
+
+def third_function():
+    calling_functions = get_calling_functions()
+    print(f"Calling functions: {calling_functions}")
+
+my_function()
+
+```
  
